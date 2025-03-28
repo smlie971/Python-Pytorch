@@ -1,0 +1,380 @@
+#1.继承nn.Module基类构建模型，先定义一个类，使之继承nn.Module，把模型需要的层放在构造函数_init_(),在forward方法中实现模型正向传播
+import torch
+from torch import nn
+import torch.nn.functional as F
+#构建模型
+class Model_Seq(nn.Module):
+    #通过继承基类nn.Module构建模型
+    def __init__(self, in_dim,n_hidden_1,n_hidden_2,out_dim):
+        super(Model_Seq,self).__init__()
+        self.flatten=nn.Flatten()
+        self.linear1=nn.Linear(in_dim,n_hidden_1)
+        self.bn1=nn.BatchNorm1d(n_hidden_1)
+        self.linear2=nn.Linear(n_hidden_1,n_hidden_2)
+        self.bn2=nn.BatchNorm1d(n_hidden_2)
+        self.out=nn.Linear(n_hidden_2,out_dim)
+    def forward(self,x):
+        x=self.flatten(x)
+        x=self.linear1(x)
+        x=self.bn1(x)
+        x=F.relu(x)
+        x=self.linear2(x)
+        x=self.bn2(x)
+        x=F.relu(x)
+        x=self.out(x)
+        x=F.softmax(x,dim=1)
+        return x
+#超参数赋值
+in_dim,n_hidden_1,n_hidden_2,out_dim=28*28,300,100,10
+model_seq=Model_Seq(in_dim,n_hidden_1,n_hidden_2,out_dim)
+print(model_seq)
+#2.使用nn.Sequential构建模型，确保前一个模块输出大小和下一个模块输入大小一致
+Seq_arg=nn.Sequential(
+    nn.Flatten(),
+    nn.Linear(in_dim,n_hidden_1),
+    nn.BatchNorm1d(n_hidden_1),
+    nn.ReLU(),
+    nn.Linear(n_hidden_1,n_hidden_2),
+    nn.BatchNorm1d(n_hidden_2),
+    nn.ReLU(),
+    nn.Linear(n_hidden_2,out_dim),
+    nn.Softmax(dim=1)
+    
+)
+in_dim,n_hidden_1,n_hidden_2,out_dim=28*28,300,100,10
+print(Seq_arg)
+#3.使用add_module给每个层指定名称
+Seq_module=nn.Sequential()
+Seq_module.add_module("flatten",nn.Flatten())
+Seq_module.add_module("linear",nn.Linear(in_dim,n_hidden_1))
+Seq_module.add_module("bn1",nn.BatchNorm1d(n_hidden_1))
+Seq_module.add_module("relu1",nn.ReLU())
+Seq_module.add_module("linear2",nn.Linear(n_hidden_1,n_hidden_2))
+Seq_module.add_module("bn2",nn.BatchNorm1d(n_hidden_2))
+Seq_module.add_module("relu2",nn.ReLU())
+Seq_module.add_module("out",nn.Linear(n_hidden_2,out_dim))
+Seq_module.add_module("softmax",nn.Softmax(dim=1))
+in_dim,n_hidden_1,n_hidden_2,out_dim=28*28,300,100,10
+print(Seq_module)
+from collections import OrderedDict
+Seq_dict=nn.Sequential(OrderedDict([("flatten",nn.Flatten()),
+                                  ("linear1",nn.Linear(in_dim,n_hidden_1)),
+                                  ("bn1",nn.BatchNorm1d(n_hidden_1)),
+                                  ("relu1",nn.ReLU()),
+                                  ("linear2",nn.Linear(n_hidden_1,n_hidden_2)),
+                                  ("bn2",nn.BatchNorm1d(n_hidden_2)),
+                                  ("relu2",nn.ReLU()),
+                                  ("out",nn.Linear(n_hidden_2,out_dim)),
+                                  ("softmax",nn.Softmax(dim=1))]))
+in_dim,n_hidden_1,n_hidden_2,out_dim=28*28,300,100,10
+print(Seq_dict)
+#4.继承nn.Module基类并应用模型容器来构建模型
+#使用nn.Sequential
+class Model_lay(nn.Module):
+    #使用nn.Sequential构建网络。Sequential将网络的层组合一起
+    def __init__(self,in_dim,n_hidden_1,n_hidden_2,out_dim):
+        super(Model_lay,self).__init__()
+        self.flatten=nn.flatten()
+        self.layer1=nn.Sequential(nn.Linear(in_dim,n_hidden_1),nn.BatchNorm1d(n_hidden_1))
+        self.layer2=nn.Sequential(nn.Linear(n_hidden_1,n_hidden_2),nn.BatchNorm1d(n_hidden_2))
+        self.out=nn.Sequential(nn.Linear(n_hidden_2,out_dim))
+    def forward(self,x):
+        x=self.flatten()
+        x=F.relu(self.layer1(x))
+        x=F.relu(self.layer2(x))
+        x=F.softmax(self.out(x),dim=1)
+        return x
+class Model_lst(nn.Module):
+    def __init__(self,in_dim,n_hidden_1,n_hidden_2,out_dim):
+        super(Model_lst,self).__init__()
+        self.layers=nn.ModuleList([
+        nn.Flatten(),
+        nn.Linear(in_dim,n_hidden_1),
+        nn.BatchNorm1d(n_hidden_1),
+        nn.ReLU(),
+        nn.Linear(n_hidden_1,n_hidden_2),
+        nn.BatchNorm1d(n_hidden_2),
+        nn.ReLU(),
+        nn.Linear(n_hidden_2,out_dim),
+        nn.Softmax(dim=1)
+    ])
+    def forward(self,x):  
+       for layer in self.layers:
+            x=layer(x)
+       return x
+#使用nn.ModuleDict
+class Model_dict(nn.Module):
+    def __init__(self,in_dim,n_hidden_1,n_hidden_2,out_dim):
+        super(Model_dict,self).__init__()
+        self.layers_dict=nn.ModuleDict({("flatten",nn.Flatten()),
+                                  ("linear1",nn.Linear(in_dim,n_hidden_1)),
+                                  ("bn1",nn.BatchNorm1d(n_hidden_1)),
+                                  ("relu1",nn.ReLU()),
+                                  ("linear2",nn.Linear(n_hidden_1,n_hidden_2)),
+                                  ("bn2",nn.BatchNorm1d(n_hidden_2)),
+                                  ("relu2",nn.ReLU()),
+                                  ("out",nn.Linear(n_hidden_2,out_dim)),
+                                  ("softmax",nn.Softmax(dim=1))})
+    def forward(self,x):
+        layers=["flatten","linera1","bn1","relu","linear2","bn2","relu","out","softmax"]
+        for layer in layers:
+            x=self.layers_dict[layer](x)
+        return x
+#自定义网络模块
+class RestNetBasicBlock(nn.Module):
+    def __init__(self,in_channels,out_channels,stride):
+        super(RestNetBasicBlock,self).__init__()
+        self.conv1=nn.Conv2d(in_channels,out_channels,kernel_size=3,stride=stride,padding=1)
+        self.bn1=nn.BatchNorm2d(out_channels)
+        self.conv2=nn.Conv2d(in_channels,out_channels,kernel_size=3,stride=stride,padding=1)
+        self.bn2=nn.BatchNorm2d(out_channels)
+    def forward(self,x):
+        output=self.conv1(x)
+        output=F.relu(self.bn1(output))
+        output=self.conv2(output)
+        output=self.bn2(output)
+        return F.relu(x+output)
+class RestNetDownBlock(nn.Module):
+    def __init__(self,in_channels,out_channels,stride):
+        super(RestNetDownBlock,self).__init__()
+        self.conv1=nn.Conv2d(in_channels,out_channels,kernel_size=3,stride=stride[0],padding=1)
+        self.bn1=nn.BatchNorm2d(out_channels)
+        self.conv2=nn.Conv2d(in_channels,out_channels,kernel_size=3,stride=stride[1],padding=1)
+        self.bn2=nn.BatchNorm2d(out_channels)
+        self.extra=nn.Sequential(nn.Conv2d(in_channels,out_channels,kernel_size=3,stride=stride[1],padding=0),
+                                nn.BatchNorm2d(out_channels))
+    def forward(self,x):
+        extra_x=self.extra(x)
+        output=self.conv1(x)
+        output=F.relu(self.bn1(output))
+        output=self.conv2(output)
+        output=self.bn2(output)
+        return F.relu(extra_x+output)
+class ResNet18(nn.Module):
+    def __init__(self):
+        super(ResNet18, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = nn.Sequential(
+            ResNetBasicBlock(64, 64, 1),
+            ResNetBasicBlock(64, 64, 1)
+        )
+        self.layer2 = nn.Sequential(
+            ResNetDownBlock(64, 128, 2),
+            ResNetBasicBlock(128, 128, 1)
+        )
+        self.layer3 = nn.Sequential(
+            ResNetDownBlock(128, 256, 2),
+            ResNetBasicBlock(256, 256, 1)
+        )
+        self.layer4 = nn.Sequential(
+            ResNetDownBlock(256, 512, 2),
+            ResNetBasicBlock(512, 512, 1)
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))  # 自适应平均池化，特征图压缩为 512 × 1 × 1。
+        self.fc = nn.Linear(512, 10)
+    def forward(self,x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.maxpool(out)
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = self.avgpool(out)
+        out = out.view(out.size(0), -1) 
+        out = self.fc(out)
+        return out
+
+#设置为训练模式model.train()#保证BN层用每一批数据的均值和方差
+#梯度清零optimizer.zero_grad()
+#求损失值y_prev=model(x)loss=loss_fun(y_prev,y_true)
+#更新参数optimizer.step()
+#设置为测试或者验证模式model.eval()#用全部训练数据的均值和方差
+#在不跟踪梯度的模式下计算损失值预测值with.torch.no_grad():
+import numpy as np
+import torch
+from torchvision.datasets import mnist
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
+import torch.optim as optim
+from torch import nn
+from torch.utils.tensorboard import SummaryWriter
+
+# 定义超参数
+train_batch_size = 64
+test_batch_size = 128
+learning_rate = 0.01
+lr = 0.01
+momentum = 0.5
+num_epoches = 10  # 定义训练轮数
+
+# 定义预处理函数
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize([0.5], [0.5])
+])
+'''
+transforms.ToTensor()PIL 图像或 NumPy ndarray 转换为 FloatTensor，并且将图像的像素值从 [0, 255] 归一化到 [0.0, 1.0]。如果输入图像是 RGB，输出的张量形状将是 C x H x W
+transforms.Normalize([0.5], [0.5])对图像的每个通道进行标准化处理，即减去均值并除以标准差。在这个例子中，均值和标准差都设置为 0.5。这意味着每个通道的每个像素值将被转换为 (pixel_value / 255.0 - 0.5) / 0.5
+'''
+# 下载数据，并对数据预处理
+train_dataset = mnist.MNIST('../data/', train=True, transform=transform, download=True)
+test_dataset = mnist.MNIST('../data/', train=False, transform=transform)
+
+# 得到一个生成器，可节省内存
+train_loader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False)
+
+# 部分数据可视化
+import matplotlib.pyplot as plt
+%matplotlib inline
+examples = enumerate(test_loader)
+batch_idx, (example_data, example_targets) = next(examples)#next(examples) 的返回值解包并赋值给三个变量
+fig = plt.figure()
+for i in range(6):
+    plt.subplot(2, 3, i + 1)# 2 行 3 列的网格中创建子图。每个子图可以绘制不同的图形或数据集
+    plt.tight_layout()
+    plt.imshow(example_data[i][0], cmap='gray', interpolation='none')#example_data 是一个包含多个图像数据的数组或列表，i 是当前图像的索引，[0] 表示我们只关心该索引下的图像数据
+    plt.title("Ground Truth:{}".format(example_targets[i]))
+    plt.xticks([])
+    plt.yticks([])
+
+# 构建网络
+class Net(nn.Module):
+    def __init__(self, in_dim, n_hidden_1, n_hidden_2, out_dim):
+        super(Net, self).__init__()
+        self.flatten = nn.Flatten()
+        self.layer1 = nn.Sequential(nn.Linear(in_dim, n_hidden_1), nn.BatchNorm1d(n_hidden_1))
+        self.layer2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.BatchNorm1d(n_hidden_2))
+        self.out = nn.Sequential(nn.Linear(n_hidden_2, out_dim))
+
+    def forward(self, x):
+        x = self.flatten(x)
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer2(x))
+        x = F.softmax(self.out(x), dim=1)
+        return x
+
+# 检测是否有GPU
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# 实例化网络
+model = Net(28 * 28, 300, 100, 10)
+model.to(device)
+
+# 定义损失器和优化器
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+
+# 训练模型
+losses = []
+acces = []
+eval_losses = []
+eval_acces = []
+writer = SummaryWriter(log_dir='logs', comment='train-loss')
+
+for epoch in range(num_epoches):
+    train_loss = 0
+    train_acc = 0
+    model.train()
+    if epoch % 5 == 0:
+        optimizer.param_groups[0]['lr'] *= 0.9#优化器中第一个参数组（param_groups）的学习率乘以 0.9
+        print("学习率:{:.6f}".format(optimizer.param_groups[0]['lr']))
+
+    for img, label in train_loader:
+        img = img.to(device)
+        label = label.to(device)
+        # 正向传播
+        out = model(img)
+        loss = criterion(out, label)
+        # 反向传播
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        # 记录误差
+        train_loss += loss.item()
+        # 保存loss与epoch数值
+        writer.add_scalar('Train', train_loss / len(train_loader), epoch)
+        # 计算分类的准确性
+        _, pred = out.max(1)## out 张量在第二个维度（即类别维度）上的最大值,_ 是一个惯用的方式，用来表示我们不关心第一个返回值，只关心第二个返回值
+        num_correct = (pred == label).sum().item()#布尔张量中 True 的数量，即预测正确的样本数
+        acc = num_correct / img.shape[0]
+        train_acc += acc
+
+    losses.append(train_loss / len(train_loader))
+    acces.append(train_acc / len(train_loader))
+
+    # 在测试集上检验效果
+    eval_loss = 0
+    eval_acc = 0
+    model.eval()
+    with torch.no_grad():
+        for img, label in test_loader:
+            img = img.to(device)
+            label = label.to(device)
+            img = img.view(img.size(0), -1)
+            out = model(img)
+            loss = criterion(out, label)
+            # 记录误差
+            eval_loss += loss.item()
+            # 计算分类的准确性
+            _, pred = out.max(1)
+            num_correct = (pred == label).sum().item()
+            acc = num_correct / img.shape[0]
+            eval_acc += acc
+
+    eval_losses.append(eval_loss / len(test_loader))
+    eval_acces.append(eval_acc / len(test_loader))
+    print('epoch:{}, Train Loss:{:.4f}, Train Acc:{:.4f}, Test Loss:{:.4f}, Test Acc:{:.4f}'
+          .format(epoch, train_loss / len(train_loader), train_acc / len(train_loader), eval_loss / len(test_loader), eval_acc / len(test_loader)))
+
+plt.title('Train Loss')
+plt.plot(np.arange(len(losses)), losses)
+plt.legend(['Train Loss'], loc='upper right')
+import torch
+from torch.utils import data
+from torch.utils.data.dataloader import default_collate  # 导入 default_collate
+import numpy as np
+
+# 定义数据集
+class TestDataset(data.Dataset):  # 继承 Dataset
+    def __init__(self):
+        self.Data = np.asarray([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])  # 2维向量表示的数据集
+        self.Label = np.asarray([0, 1, 0, 1, 2])  # 数据集对应的标签
+
+    def __getitem__(self, index):
+        # numpy 转换为 Tensor
+        txt = torch.from_numpy(self.Data[index]).float()  # 转换为浮点型 Tensor
+        label = torch.tensor(self.Label[index])
+        return txt, label
+
+    def __len__(self):
+        return len(self.Data)
+
+# 获取数据集中数据
+Test = TestDataset()
+print("Sample data and label:", Test[2])  # 输出第3个样本
+print("Dataset length:", len(Test))  # 输出数据集长度
+
+# 使用 DataLoader 进行批量处理、打乱数据、并行加速
+test_loader = data.DataLoader(
+    Test,  # 使用 TestDataset 的实例
+    batch_size=2,  # 每个批量的大小
+    shuffle=False,  # 是否随机打乱数据
+    num_workers=0,  # 数据加载的子进程数量
+    collate_fn=default_collate,  # 默认的批量处理函数
+    pin_memory=False,  # 是否将数据保存在锁页内存
+    drop_last=False,  # 是否丢弃最后一个不完整的批量
+    timeout=0,  # 数据加载的超时时间
+    worker_init_fn=None  # 工作进程初始化函数
+)
+
+# 遍历 DataLoader
+for i, traindata in enumerate(test_loader):
+    print("Batch index:", i)
+    Data, Label = traindata
+    print("Data:", Data)
+    print("Label:", Label)
