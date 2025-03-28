@@ -1,0 +1,260 @@
+import torch
+import torch.nn.functional as F
+#计算ht
+X,W_xh=torch.normal(0,1,(2,3)),torch.normal(0,1,(3,4))#形状(2,3)
+H,W_hh=torch.normal(0,1,(2,4)),torch.normal(0,1,(4,4))
+B_h=torch.normal(0,1,(1,4))
+H1=torch.matmul(X,W_xh)+torch.matmul(H,W_hh)+B_h
+H_t=F.relu(H1)
+#计算O_t
+W_hm=torch.normal(0,1,(4,2))
+B_m=torch.normal(0,1,(1,2))
+O=torch.matmul(H_t,W_hm)+B_m
+O_t=F.softmax(O,dim=-1)
+print("H_t形状:{},O_t的形状:{}".format(H_t.shape,O_t.shape))
+H01=torch.matmul(torch.cat((X,H),1),torch.cat((W_xh,W_hh),0))+B_h
+H02=F.relu(H01)
+print("-"*30+"矩阵H_t"+"="*30)
+print(H_t)
+print("-"*30+"矩阵H02"+"-"*30)
+#实现RNN正向传播
+import numpy as np
+X=[1,2]
+state=[0.0,0.0]
+w_cell_state=np.asarray([[0.1,0.2],[0.3,0.4],[0.5,0.6]])
+b_cel=np.asarray([0.1,-0.1])
+w_output=np.asarray([[1.0],[2.0]])
+b_output=0.1
+for i in range(len(X)):
+    state=np.append(state,X[i])
+    before_activation=np.dot(state,w_cell_state)+b_cel
+    state=np.tanh(before_activation)
+    final_output=np.dot(state,w_output)+b_output
+    print("状态值_%i:"%i,state)
+    print("输出值_%i:"%i,final_output)
+#使用python实现RNN
+import torch.nn as nn
+class RNN(nn.Module):
+    def __init__(self,input_size,hidden_size,output_size):
+        super(RNN,self).__init__()
+        self.hidden_size=hidden_size
+        self.i2h=nn.Linear(input_size+hidden_size,hidden_size)
+        self.i2o=nn.Linear(input_size+hidden_size,output_size)
+        self.softmax=nn.LogSoftmax(dim=1)
+    def forward(self,input,hidden):
+        combined=torch.cat((input,hidden),1)
+        hidden=self.i2h(combined)
+        output=self.i20(combined)
+        output=self.softmax(output)
+        return output,hidden
+    def initHidden(self):
+        return torch.zeros(1,self.hidden_size)
+n_letters = 57 
+n_hidden = 128 
+n_categories = 18  
+rnn=RNN(n_letters,n_hidden,n_categories)
+#使用pytorch实现LSTM
+import torch.nn as nn
+import torch
+import torch
+import torch.nn as nn
+
+class LSTMCell(nn.Module):
+    def __init__(self, input_size, hidden_size, cell_size, output_size):
+        super(LSTMCell, self).__init__()
+        self.hidden_size = hidden_size
+        self.cell_size = cell_size
+        # 定义四个门的线性层，拼接后的输入数据和隐藏状态（input_size + hidden_size）
+        self.forget_gate = nn.Linear(input_size + hidden_size, cell_size)#遗忘门，决定丢弃多少单元状态
+        self.input_gate = nn.Linear(input_size + hidden_size, cell_size)#输入门，决定有多少新信息被添加到单元状态
+        self.output_gate = nn.Linear(input_size + hidden_size, cell_size)#输出门：决定有多少单元状态信息被用于更新隐藏状态
+        self.cell_gate = nn.Linear(input_size + hidden_size, cell_size)#候选单元状态：生成新的候选值，可能被添加到单元状态
+        self.output_layer = nn.Linear(hidden_size, output_size)#将隐藏状态映射到输出维度
+        self.sigmoid = nn.Sigmoid() # 用于门控的激活函数，输出范围在[0,1]
+        self.tanh = nn.Tanh()# 用于单元状态和隐藏状态的激活函数，输出范围在[-1,1]
+        self.softmax = nn.LogSoftmax(dim=1)
+    def forward(self, input, hidden, cell):
+        combined = torch.cat((input, hidden), 1) # 将输入和隐藏状态在维度1上拼接
+        '''计算四个门的值
+        将输入数据和上一时刻隐藏状态拼接成一个联合向量
+        通过对对应的线性层对联合向量进行线性变换
+        应用激活函数将线性变换结果映射到特定范围
+        '''
+        f_gate = self.sigmoid(self.forget_gate(combined))#遗忘门
+        i_gate = self.sigmoid(self.input_gate(combined))#输入门
+        o_gate = self.sigmoid(self.output_gate(combined))#输出门
+        z_gate = self.tanh(self.cell_gate(combined))#候选单元状态
+        # 更新单元状态
+         # 新的单元状态 = 上一时刻的单元状态 * 遗忘门 + 候选单元状态 * 输入门
+        cell = torch.add(torch.mul(cell, f_gate), torch.mul(z_gate, i_gate))
+        # 更新隐藏状态
+        hidden = torch.mul(self.tanh(cell), o_gate)
+        # 计算输出
+        output = self.output_layer(hidden)
+        output = self.softmax(output)
+        return output, hidden, cell
+    def initHidden(self):
+        return torch.zeros(1, self.hidden_size)
+    def initCell(self):
+        return torch.zeros(1, self.cell_size)
+#实例化LSTM单元，并传入输入，隐含状态等进行验证
+lstmcell=LSTMCell(input_size=10,hidden_size=20,cell_size=20,output_size=10)
+input=torch.randn(32,10)
+h_0=torch.randn(32,20)
+output,hn,cn=lstmcell(input,h_0,h_0)
+print(output.size(),hn.size(),cn.size())
+#使用pytorch实现GRU
+class GRUCell(nn.Module):
+    def __init__(self,input_size,hidden_size,output_size):
+        super(GRUCell,self).__init__()
+        self.hidden_size=hidden_size
+        self.gate=nn.Linear(input_size+hidden_size,hidden_size)#输入门：前一刻隐藏信息+此时输入输出为此时刻隐藏状态
+        self.output=nn.Linear(hidden_size,output_size)#输出门
+        self.sigmoid=nn.Sigmoid()
+        self.tanh=nn.Tanh()
+        self.softmax=nn.LogSoftmax(dim=1)
+    def forward(self,input,hidden):
+        combined=torch.cat((input,hidden),1)
+        gates = self.gate(combined)
+        z_gate, r_gate = gates.chunk(2, 1)  # 将gates分为更新门和重置门
+        '''参数2表示将张量分割成2块。
+           参数1表示沿着第二个维度（列的方向）进行分割。
+          分割后，每块的形状为(batch_size, hidden_size)
+        '''
+        z_gate=self.sigmoid(self.gate(z_gate))#更新门
+        r_gate=self.sigmoid(self.gate(r_gate))#遗忘门，前计算候选状态决定遗忘多少
+        combined01=torch.cat((input,torch.mul(hidden,r_gate)),1)
+        h1_state=self.tanh(self.gate(combined01))#候选隐藏状态
+        h_state=torch.add(torch.mul((1-z_gate),hidden),torch.mul(h1_state,z_gate))#隐藏状态更新
+        output=self.output(h_state)
+        output=self.softmax(output)
+        return output,h_state
+    def initHidden(self):
+        return torch.zeros(1,self.hidden_size)
+#实例化并传入输入、隐含状态等信息、
+gru = nn.GRU(input_size=10, hidden_size=20, batch_first=True)
+# 定义输入和初始隐藏状态
+input_tensor = torch.randn(32, 1, 10)  # 输入形状为 (batch_size, sequence_length, input_size)
+h_0 = torch.randn(1, 32, 20)  # 初始隐藏状态形状为 (num_layers, batch_size, hidden_size)
+# 计算输出和隐藏状态
+output, hn = gru(input_tensor, h_0)
+# 打印输出和隐藏状态的形状
+print(output.size(), hn.size())
+#文本处理
+#收集数据，定义停用词
+import torch.nn.functional as F
+import jieba
+raw_text="""我爱上海
+            她喜欢北京"""
+stoplist=[' ','\n']
+#利用jieba进行分词
+words=list(jieba.cut(raw_text))
+#过滤停用词，去除停用词（stopwords）。停用词是指那些对语义贡献不大、频繁出现的词（如“的”、“是”、“在”等），在文本处理时通常会被过滤掉以减少噪音
+words=[i for i in words if i not in stoplist]
+words
+#去重，然后对每个词加上索引或给一个整数
+word_to_ix={i:word for i,word in enumerate(set(words))}
+word_to_ix
+#词向量或词嵌入，采用pytorch的nn.Embedding层，把整数换为向量，参数为（词总数，向量长度）
+from torch import nn
+import torch
+embeds=nn.Embedding(6,8)
+lists=[]
+for k ,v in word_to_ix.items():
+    tensor_value=torch.tensor(k)#torch.tensor(k) 将其转换为一个 PyTorch 张量
+    lists.append((embeds(tensor_value).data))#提取嵌入向量的值并追加到列表
+lists
+#数据预处理
+#定义训练数据
+# 定义训练数据
+training_data = [
+    (("The cat ate the fish".split()), ["DET", "NN", "V", "DET", "NN"]),
+    (("They read that book".split()), ["NN", "V", "DET", "NN"])
+]
+# 定义测试数据
+testing_data = [("They ate the fish".split())]
+# 构建每个单词的索引字典
+word_to_ix = {}  # 单词的索引字典
+# 遍历训练数据中的每个句子和对应的词性标签
+for sent, tags in training_data:
+    for word in sent:  # 遍历句子中的每个单词
+        if word not in word_to_ix:
+            word_to_ix[word] = len(word_to_ix)  # 将单词添加到字典中，并赋予唯一索引
+print(word_to_ix)  # 打印最终的单词到索引的映射字典
+# 手工设置词性的索引字典
+tag_to_ix = {"DET": 0, "NN": 1, "V": 2}
+#构建网络共三层，分别为嵌入层、LSTM层、全连接层
+class LSTMTagger(nn.Module):
+    def __init__(self,embedding_dim,hidden_dim,vocab_size,tagset_size):
+       super(LSTMTagger,self).__init__()
+       self.hidden_dim=hidden_dim#LSTM隐藏层维度
+       self.word_embeddings=nn.Embedding(vocab_size,embedding_dim)#嵌入层
+       self.lstm=nn.LSTM(embedding_dim,hidden_dim)#nn.LSTM 是一个高度封装的模块，它内部已经实现了 LSTM 的所有细节，包括遗忘门、输入门和输出门的计算
+       self.hidden2tag=nn.Linear(hidden_dim,tagset_size)#全连接层
+       self.hidden=self.init_hidden()#用于初始化隐藏状态和细胞状态
+    #初始化隐含状态state以及c
+    def init_hidden(self):
+        return(torch.zeros(1,1,self.hidden_dim),
+              torch.zeros(1,1,self.hidden_dim))#第一个张量是隐藏状态，第二个张量是细胞状态
+    def forward(self,sentence):
+        #获得词嵌入矩阵embeds
+        embeds=self.word_embeddings(sentence)#嵌入向量，形状为 (sentence_length, embedding_dim)
+        #按LSTM格式，修改embeds形状
+        lstm_out,self.hidden=self.lstm(embeds.view(len(sentence),1,-1),self.hidden)#之前定义的 LSTM 层，self.lstm,lstm_out：LSTM 层的输出，形状为 (sequence_length, batch_size, hidden_dim)。
+        '''
+        len(sentence) 是句子的长度（即单词数）。
+        1 表示批次大小（batch size），这里假设每次只处理一个句子。
+        -1 表示自动计算最后一个维度的大小，这里会自动调整为 embedding_dim。
+        '''
+        #修改隐含状态的形状，作为全连接层的输入
+        tag_space=self.hidden2tag(lstm_out.view(len(sentence),-1))
+        #计算每个单词属于各词性的概率
+        tag_scores=F.log_softmax(tag_space,dim=1)
+        return tag_scores
+#把数据转换为模型要求格式，即把输入数据转换为torch.LongTensor
+def prepare_sequence(seq,to_ix):
+    idxs=[to_ix[w] for w in seq]#遍历 seq 中的每个单词 w,通过 to_ix[w] 将单词转换为对应的索引。
+    tensor=torch.LongTensor(idxs)#索引列表 idxs 转换为 PyTorch 的长整型张量
+    return tensor
+#定义超参数，实例化模型，选择损失函数，优化器
+embedding_dim=10
+hidden_dim=3
+model=LSTMTagger(embedding_dim,hidden_dim,len(word_to_ix),len(tag_to_ix))
+loss_function=nn.NLLLoss()
+optimizer=torch.optim.SGD(model.parameters(),lr=0.1)
+inputs=prepare_sequence(training_data[0][0],word_to_ix)
+tag_scores=model(inputs)
+print(training_data[0][0])
+print(inputs)
+print(tag_scores)
+print(torch.max(tag_scores,1))
+#结果不理想。训练模型提供精度
+for epoch in range(400):
+    for sentence,tags in training_data:
+        #清除先前梯度
+        model.zero_grad()
+        #重新初始化隐含层数据
+        model.hidden=model.init_hidden()
+        #按网络要求格式处理输入数据和真实标签数据
+        sentence_in=prepare_sequence(sentence,word_to_ix)
+        targets=prepare_sequence(tags,tag_to_ix)
+        #实例化模型
+        tag_scores=model(sentence_in)
+        #计算损失更新参数
+        loss=loss_function(tag_scores,targets)
+        loss.backward()
+        optimizer.step()
+        #查看模型训练结果
+inputs=prepare_sequence(training_data[0][0],word_to_ix)
+tag_scores=model(inputs)
+print(training_data[0][0])
+print(inputs)
+print(tag_scores)
+print(torch.max(tag_scores,1))
+#测试模型
+test_inputs=prepare_sequence(testing_data[0],word_to_ix)
+tag_scores01=model(test_inputs)
+print(training_data[0][0])
+print(inputs)
+print(tag_scores01)
+print(torch.max(tag_scores01,1))
